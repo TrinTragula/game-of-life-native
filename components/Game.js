@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import Options from './Options';
@@ -11,14 +11,18 @@ const Game = () => {
     const [height, setHeight] = useState(10);
     const [speed, setSpeed] = useState(5);
     const [, setRerender] = useState(false);
-    const [playing, setPlaying] = useState(null);
+    const [playTimeout, setPlayTimeout] = useState(null);
+    const playing = useRef(false);
 
-    const updateGrid = () => {
-        setGrid(oldGrid => {
-            oldGrid.update();
-            return oldGrid;
-        });
-        setRerender(render => !render);
+    const updateGrid = (forced) => {
+        if (playing.current || forced) {
+            setGrid(oldGrid => {
+                oldGrid.update();
+                return oldGrid;
+            });
+            setRerender(render => !render);
+            if (playing.current && playTimeout) setTimeout(updateGrid, playTimeout);
+        }
     }
 
     const onOptionsChangeHandler = (newWidth, newHeight, newSpeed) => {
@@ -31,11 +35,7 @@ const Game = () => {
         }
         if (speed !== newSpeed) {
             setSpeed(newSpeed);
-            if (playing) {
-                clearInterval(playing);
-                const timer = setInterval(updateGrid, 1000 / newSpeed);
-                setPlaying(timer);
-            }
+            setPlayTimeout(1000 / newSpeed);
         }
     }
 
@@ -53,22 +53,28 @@ const Game = () => {
     }
 
     const onUpdateHandler = () => {
-        updateGrid();
+        updateGrid(true);
     }
 
     const playHandler = () => {
-        if (playing) {
-            clearInterval(playing);
-            setPlaying(null);
+        if (playing.current) {
+            setPlayTimeout(null);
+            playing.current = false;
         } else {
-            const timer = setInterval(updateGrid, 1000 / speed);
-            setPlaying(timer);
+            setPlayTimeout(1000 / speed);
+            playing.current = true;
         }
     }
 
+    useEffect(() => {
+        if (playing.current && playTimeout) {
+            updateGrid();
+        }
+    }, [playing.current, playTimeout]);
+
     return (
         <View style={styles.container}>
-            <Options onOptionsChange={onOptionsChangeHandler} onClear={onClearHandler} onUpdate={onUpdateHandler} onPlay={playHandler} playing={playing} />
+            <Options onOptionsChange={onOptionsChangeHandler} onClear={onClearHandler} onUpdate={onUpdateHandler} onPlay={playHandler} playing={playing.current} />
             <GridView grid={grid} height={height} width={width} onChange={onCellChangeHandler} />
         </View>
     );
